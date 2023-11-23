@@ -9,7 +9,10 @@ import (
 func TestNewWorld(t *testing.T) {
 	height := 10
 	width := 4
-	world := life.NewWorld(height, width)
+	world, err := life.NewWorld(height, width)
+	if err != nil {
+		t.Errorf("somrthing went wrong with func NewWorld")
+	}
 	if world.Height != height {
 		t.Errorf("expected height: %d, actual height: %d", height, world.Height)
 	}

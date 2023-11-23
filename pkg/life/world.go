@@ -1,6 +1,7 @@
 package life
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 )
@@ -11,7 +12,11 @@ type World struct {
 	Cells  [][]bool
 }
 
-func NewWorld(height, width int) *World {
+func NewWorld(height, width int) (*World, error) {
+	if height <= 0 || width <= 0 {
+		return nil, errors.New("Height and width must be positive numbers")
+	}
+
 	cells := make([][]bool, height)
 	for i := range cells {
 		cells[i] = make([]bool, width)
@@ -20,7 +25,7 @@ func NewWorld(height, width int) *World {
 		Height: height,
 		Width:  width,
 		Cells:  cells,
-	}
+	}, nil
 }
 
 func (w *World) next(x, y int) bool {

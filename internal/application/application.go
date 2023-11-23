@@ -3,9 +3,12 @@ package application
 import (
 	"context"
 	"fmt"
-	"time"
+	"os"
+	"os/signal"
 
-	"github.com/Ameba108/game/pkg/life"
+	"github.com/Ameba108/game/http/server"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Config struct {
@@ -23,21 +26,47 @@ func New(config Config) *Application {
 	}
 }
 
-func (a *Application) Run(ctx context.Context) error {
-	currentWorld := life.NewWorld(a.Cfg.Height, a.Cfg.Width)
-	nextWorld := life.NewWorld(a.Cfg.Height, a.Cfg.Width)
-	currentWorld.RandInit(30)
-	for {
-		fmt.Println(currentWorld)
-		life.NextState(currentWorld, nextWorld)
-		currentWorld = nextWorld
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			time.Sleep(100 * time.Millisecond)
-			break
-		}
-		fmt.Print("\033[H\033[2J")
+func (a *Application) Run(ctx context.Context) int {
+	// Создание логгера с настройками для production
+	logger := setupLogger()
+
+	shutDownFunc, err := server.Run(ctx, logger, a.Cfg.Height, a.Cfg.Width)
+	if err != nil {
+		logger.Error(err.Error())
+
+		return 1 // вернем код для регистрация ошибки системой
 	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	<-c
+	cancel()
+	//  завершим работу сервера
+	shutDownFunc(ctx)
+
+	return 0
+
+}
+
+// настройки логгера
+func setupLogger() *zap.Logger {
+	// Настройка конфигурации логгера
+	config := zap.NewProductionConfig()
+
+	// Уровень логирования
+	config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+
+	// Настройка логгера с конфигом
+	logger, err := config.Build()
+	if err != nil {
+		fmt.Printf("Ошибка настройки логгера: %v\n", err)
+	}
+
+	return logger
 }
